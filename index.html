@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Randomized Audio Boardgame</title>
+    <style>
+      body {
+        font-family: "Comic Sans MS", cursive, sans-serif;
+        background: linear-gradient(to bottom right, #fdf6e3, #d2f1f0);
+        margin: 0;
+        padding: 10px;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+
+      #audio-board {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(4, 1fr);
+        gap: 16px;
+        width: 95vw;
+        /* Subtract total vertical gaps from viewport height */
+        height: calc(90vh - 16px * 3);
+        max-height: calc(90vh - 16px * 3);
+        padding: 8px;
+        box-sizing: border-box;
+      }
+
+      .audio-figure {
+        width: 100%;
+        height: 100%;
+        background: #ffffff;
+        border: 2px solid #ccc;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: stretch;
+        gap: 10px;
+        cursor: pointer;
+        padding: 8px;
+        transition: transform 0.2s, box-shadow 0.3s, border-color 0.3s;
+      }
+
+      .figure-img {
+        flex: 1;
+        width: 100%;
+        object-fit: contain;
+        border-radius: 8px;
+        transform: rotate(-90deg);
+      }
+
+      .play-button {
+        flex: 1.2; /* etwas größer als Bild */
+        width: 100%;
+        background: #0078d4;
+        border: none;
+        color: white;
+        font-size: 3.6rem;
+        font-weight: bold;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.3s, transform 0.2s;
+      }
+
+      .play-button:hover {
+        background: #005fa3;
+        transform: scale(1.03);
+      }
+
+      .audio-figure.selected {
+        border-color: #ff7f50;
+        box-shadow: 0 0 20px #ff7f50;
+        background: #fff0e0;
+      }
+
+      /* Optional: für kleine Screens */
+      @media (max-width: 600px) {
+        #audio-board {
+          gap: 18px;
+          padding: 10px;
+        }
+      }
+
+      .level-screen {
+        text-align: center;
+        margin: auto;
+      }
+
+      .level-screen h2 {
+        font-size: 24px;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="audio-board"></div>
+
+    <script>
+      const level1Folders = ["Ital1", "Flugmodus", "Afro", "Lucky"];
+      const level2Folders = ["Mayer", "Season", "LetItBe", "Invention"];
+      const level3Folders = ["Flugmodus2", "Flugmodus3", "Flugmodus4", "Poldi"];
+      const level4Folders = [
+        "Eb7/DrumBass",
+        "Eb7/Flute",
+        "Eb7/Piano",
+        "Eb7/Mallet",
+      ];
+      const level5Folders = ["Lucky4/1", "Lucky4/2", "Lucky4/3", "Lucky4/4"];
+      const level6Folders = [
+        "WireLevel/Chaka",
+        "WireLevel/Kanye",
+        "WireLevel/Bowly",
+        "WireLevel/Dua",
+      ];
+      const level7Folders = ["wr2", "christmas", "Beauty", "Poldi"];
+      const level8Folders = [
+        "Metronome/A",
+        "Metronome/B",
+        "Metronome/C",
+        "Metronome/D",
+      ];
+      const level9Folders = ["Mars/ToMars", "Analysis", "Coldplay", "Afro"];
+      const level10Folders = ["wr2", "christmas", "Beauty", "KommSys"];
+
+      const numbers = ["1", "2", "3", "4"];
+      const board = document.getElementById("audio-board");
+
+      let selectedIndices = [];
+      let randomizedSources = [];
+      let matchedPairs = 0;
+      let currentLevel = 1;
+
+      function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+      }
+
+      function getSources(folders) {
+        const sources = [];
+        folders.forEach((folder) => {
+          numbers.forEach((num) => {
+            sources.push(`${folder}/${num}.mp3`);
+          });
+        });
+        return shuffle(sources);
+      }
+      function checkCompatibility(sources) {
+        if (selectedIndices.length === 2) {
+          const [i1, i2] = selectedIndices;
+          const src1 = sources[i1];
+          const src2 = sources[i2];
+          const parts1 = src1.split("/");
+          const folder1 =
+            parts1.length > 1 ? parts1[parts1.length - 2] : parts1[0];
+          const parts2 = src2.split("/");
+          const folder2 =
+            parts2.length > 1 ? parts2[parts2.length - 2] : parts2[0];
+          const body = document.body;
+
+          if (folder1 === folder2) {
+            // Correct match
+            body.style.background = "#c8f7c5"; // green flash
+            const audioYes = new Audio("Sounds/yes.mp3");
+            audioYes.play();
+          } else {
+            // Wrong match
+            body.style.background = "#f7c5c5"; // red flash
+            const audioNo = new Audio("Sounds/no.mp3");
+            audioNo.play();
+          }
+
+          // Reset the selection and background after short delay
+          setTimeout(() => {
+            body.style.background = "";
+            selectedIndices = [];
+            document
+              .querySelectorAll(".audio-figure.selected")
+              .forEach((el) => {
+                el.classList.remove("selected");
+              });
+          }, 1000);
+        }
+      }
+
+      function renderBoard(sources) {
+        board.innerHTML = "";
+        selectedIndices = [];
+        matchedPairs = 0;
+
+        sources.forEach((audioSrc, i) => {
+          const container = document.createElement("div");
+          container.className = "audio-figure";
+          container.dataset.index = i;
+
+          const img = document.createElement("img");
+          img.className = "figure-img";
+          img.src = `Icons/${i + 1}.jpeg`;
+          img.alt = `Figure ${i + 1}`;
+
+          const audio = new Audio(audioSrc);
+          audio.preload = "auto";
+
+          const button = document.createElement("button");
+          button.className = "play-button";
+          button.textContent = "Play";
+
+          button.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (audio.paused) {
+              audio.play();
+              button.textContent = "Pause";
+              audio.addEventListener(
+                "ended",
+                () => (button.textContent = "Play")
+              );
+            } else {
+              audio.pause();
+              button.textContent = "Play";
+            }
+          });
+
+          container.appendChild(img);
+          container.appendChild(button);
+          board.appendChild(container);
+
+          container.addEventListener("click", function () {
+            if (container.classList.contains("selected")) {
+              container.classList.remove("selected");
+              selectedIndices = selectedIndices.filter((idx) => idx !== i);
+            } else if (selectedIndices.length < 2) {
+              container.classList.add("selected");
+              selectedIndices.push(i);
+              checkCompatibility(randomizedSources); // ← call here
+            }
+          });
+        });
+      }
+
+      function getLevelFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        const level = parseInt(params.get("level"));
+        if (level <= 10 && level >= 1) {
+          return level;
+        }
+        return 1;
+      }
+
+      function loadCurrentLevel() {
+        currentLevel = getLevelFromURL();
+        const folders =
+          currentLevel === 1
+            ? level1Folders
+            : currentLevel === 2
+            ? level2Folders
+            : currentLevel === 3
+            ? level3Folders
+            : currentLevel === 4
+            ? level4Folders
+            : currentLevel === 5
+            ? level5Folders
+            : currentLevel === 6
+            ? level6Folders
+            : currentLevel === 7
+            ? level7Folders
+            : currentLevel === 8
+            ? level8Folders
+            : currentLevel === 9
+            ? level9Folders
+            : currentLevel === 10
+            ? level10Folders
+            : level1Folders;
+        randomizedSources = getSources(folders);
+        renderBoard(randomizedSources);
+      }
+
+      // Load level manually from URL
+      loadCurrentLevel();
+    </script>
+  </body>
+</html>
