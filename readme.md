@@ -2,7 +2,7 @@
 
 <p align="center">
     <a href="https://konradbogen.com/playlist" target="_blank" rel="noopener">
-        <img src="./logo.png" alt="Playlist — Logo" width="100%">
+        <img src="./logo.png" alt="Playlist — Logo" width="250px">
     </a>
 </p>
 
