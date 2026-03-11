@@ -23,11 +23,13 @@ const folders = [
   ["Metronome/A", "Metronome/B", "Metronome/C", "Metronome/D"],
   ["Mars/ToMars", "Analysis", "Coldplay", "Afro"],
   ["wr2", "christmas", "Beauty", "KommSys"],
+  ["Disco", "Piano", "Analysis", "Mendel"],
+  ["Chords", "Flugmodus", "Afro", "KommSys"],
 ];
 const numbers = ["1", "2", "3", "4"];
 const board = document.getElementById("audio-board");
 
-let figures = [];
+let figures = new Map();
 let selectedIndices = [];
 let randomizedSources = [];
 let matchedPairs = 0;
@@ -58,7 +60,7 @@ function loadCurrentLevel() {
 function getLevelFromURL() {
   const params = new URLSearchParams(window.location.search);
   const level = parseInt(params.get("level"));
-  if (level <= 10 && level >= 1) {
+  if (level <= folders.length && level >= 1) {
     return level;
   }
   return 1;
@@ -102,6 +104,7 @@ function renderBoard(sources) {
 
   sources.forEach((audioSrc, i) => {
     var figure = new Figure(audioSrc, i);
+    figures[i] = figure;
     var container = figure.get_container();
     container.addEventListener("click", function () {
       if (container.classList.contains("selected")) {
@@ -146,6 +149,9 @@ function check_compatibility(sources) {
     const { folder1, folder2 } = get_selected_folders(sources);
     if (folder1 === folder2) {
       flash_correct();
+      figures[selectedIndices[0]].deactivate();
+      figures[selectedIndices[1]].deactivate();
+      figures[selectedIndices[0]].play();
     } else {
       flash_wrong();
     }

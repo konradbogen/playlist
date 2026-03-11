@@ -25,6 +25,11 @@ class Figure {
     return this.container;
   }
 
+  play() {
+    this.audio.currentTime = 0;
+    this.audio.play().catch(() => {});
+  }
+
   create_play_button(audio) {
     /**
      * Create a play/pause button wired to the provided audio element.
@@ -39,7 +44,7 @@ class Figure {
     button.addEventListener("click", (e) => {
       e.stopPropagation();
       if (audio.paused) {
-        audio.play();
+        this.play();
         button.textContent = "Pause";
         audio.addEventListener("ended", () => (button.textContent = "Play"));
       } else {
@@ -59,12 +64,15 @@ class Figure {
 
     if (this.button) {
       this.button.disabled = true;
+      this.button.style.backgroundColor = "#d3d3d3"; // light gray
+      this.button.style.color = "grey";
+      this.button.style.border = "1px solid #bfbfbf";
+      this.button.style.backgroundImage = "none";
+      this.button.style.webkitAppearance = "none";
+      this.button.style.appearance = "none";
     }
     if (this.img) {
       this.img.style.filter = "grayscale(100%)";
-    }
-    if (this.container) {
-      this.container.style.backgroundColor = "grey";
     }
   }
 
@@ -81,7 +89,7 @@ class Figure {
       baseHost === "konradbogen.com" || baseHost === "www.konradbogen.com";
     const needsPrefix = !isProd && !/^(https?:|\/\/|file:|\/)/.test(audioSrc);
     const audio = new Audio(
-      needsPrefix ? "/play_content/" + audioSrc : "/play/" + audioSrc
+      needsPrefix ? "/play_content/" + audioSrc : "/play_content/" + audioSrc,
     );
     audio.preload = "auto";
     return audio;
