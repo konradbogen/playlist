@@ -7,26 +7,11 @@
  * the "level" URL parameter (1–10).
  *
  * Key functions:
- * - get_sources(folders): produce shuffled "<folder>/<number>.mp3" entries.
  * - renderBoard(sources): create the interactive board and attach handlers.
  * - check_compatibility(sources): compare selected items' folders and trigger feedback.
  * - loadCurrentLevel(): read level from URL and initialize the board.
  */
-const folders = [
-  ["Ital1", "Flugmodus", "Afro", "Lucky"],
-  ["Mayer", "Season", "LetItBe", "Invention"],
-  ["Flugmodus2", "Flugmodus3", "Flugmodus4", "Poldi"],
-  ["Eb7/DrumBass", "Eb7/Flute", "Eb7/Piano", "Eb7/Mallet"],
-  ["Lucky4/1", "Lucky4/2", "Lucky4/3", "Lucky4/4"],
-  ["WireLevel/Chaka", "WireLevel/Kanye", "WireLevel/Bowly", "WireLevel/Dua"],
-  ["wr2", "christmas", "Beauty", "Poldi"],
-  ["Metronome/A", "Metronome/B", "Metronome/C", "Metronome/D"],
-  ["Mars/ToMars", "Analysis", "Coldplay", "Afro"],
-  ["wr2", "christmas", "Beauty", "KommSys"],
-  ["Disco", "Piano", "Analysis", "Mendel"],
-  ["Chords", "Flugmodus", "Afro", "KommSys"],
-];
-const numbers = ["1", "2", "3", "4"];
+
 const board = document.getElementById("audio-board");
 
 let figures = new Map();
@@ -41,11 +26,57 @@ let currentLevel = 1;
  * Side effects: sets global currentLevel and randomizedSources, and calls renderBoard.
  * @returns {void}
  */
-function loadCurrentLevel() {
+async function loadCurrentLevel() {
   currentLevel = getLevelFromURL();
-  const current_folders = folders[currentLevel - 1];
-  randomizedSources = get_sources(current_folders);
+
+  const response = await fetch(
+    `../leveleditor/php/storage.php?action=get_level&id=${currentLevel}`,
+  );
+
+  const data = await response.json();
+
+  randomizedSources = shuffle(data);
   renderBoard(randomizedSources);
+}
+
+/**
+ * Creates a start overlay to unlock audio/video on iOS.
+ */
+function createStartButton() {
+  const overlay = document.createElement("div");
+  Object.assign(overlay.style, {
+    position: "fixed",
+    top: "0",
+    left: "0",
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(255,255,255,0.95)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: "1000",
+  });
+
+  const btn = document.createElement("button");
+  btn.textContent = "Start Game";
+  btn.style.padding = "20px 40px";
+  btn.style.fontSize = "24px";
+
+  btn.onclick = () => {
+    // Prime every figure
+    figures.forEach((fig) => {
+      if (fig.player && fig.ytReady) {
+        fig.player.mute();
+        fig.player.playVideo();
+        fig.player.pauseVideo();
+        fig.player.unMute();
+      }
+    });
+    overlay.remove();
+  };
+
+  overlay.appendChild(btn);
+  document.body.appendChild(overlay);
 }
 
 /**
@@ -59,28 +90,13 @@ function loadCurrentLevel() {
  */
 function getLevelFromURL() {
   const params = new URLSearchParams(window.location.search);
-  const level = parseInt(params.get("level"));
-  if (level <= folders.length && level >= 1) {
-    return level;
+  const levelParam = params.get("level");
+  let level = 1;
+  if (levelParam !== null) {
+    level = parseInt(levelParam, 10);
+    if (Number.isNaN(level)) level = 0;
   }
-  return 1;
-}
-
-/**
- * Generate and return a shuffled list of MP3 source paths by combining each folder with entries
- * from a global `numbers` array.
- *
- * @param {string[]} folders - Array of folder path strings.
- * @returns {string[]} Shuffled array of "<folder>/<number>.mp3" source paths.
- */
-function get_sources(folders) {
-  const sources = [];
-  folders.forEach((folder) => {
-    numbers.forEach((num) => {
-      sources.push(`${folder}/${num}.mp3`);
-    });
-  });
-  return shuffle(sources);
+  return level;
 }
 
 /**
@@ -97,15 +113,19 @@ function get_sources(folders) {
  * @see Figure#get_container
  * @see check_compatibility
  */
-function renderBoard(sources) {
+function renderBoard(rows) {
+  // Change let figures = new Map(); to an object if you use index keys
+  let figures = {};
   board.innerHTML = "";
   selectedIndices = [];
   matchedPairs = 0;
 
-  sources.forEach((audioSrc, i) => {
-    var figure = new Figure(audioSrc, i);
-    figures[i] = figure;
-    var container = figure.get_container();
+  rows.forEach((row, i) => {
+    const figure = new Figure(row.youtube_link, row.start_sec, row.end_sec, i);
+    figures[i] = figure; // Store in the global object
+
+    const container = figure.get_container();
+    board.appendChild(container);
     container.addEventListener("click", function () {
       if (container.classList.contains("selected")) {
         container.classList.remove("selected");
@@ -113,12 +133,19 @@ function renderBoard(sources) {
       } else if (selectedIndices.length < 2) {
         container.classList.add("selected");
         selectedIndices.push(i);
-        check_compatibility(randomizedSources);
+        check_compatibility(rows);
       }
     });
-    board.appendChild(container);
   });
+
+  // Show the overlay after the board is rendered
+  createStartButton();
 }
+
+// Move this OUTSIDE renderBoard to the global scope
+window.onYouTubeIframeAPIReady = function () {
+  Object.values(figures).forEach((f) => f.onYTReady());
+};
 
 /**
  * Randomly shuffles an array in place using the Fisher–Yates algorithm.
@@ -137,24 +164,26 @@ function shuffle(array) {
 /**
  * Check compatibility between two selected items and provide feedback.
  *
- * When exactly two items are selected, compares their folders (via
- * get_selected_folders), flashes success if they match or error if not,
+ * When exactly two items are selected, compares their folders, flashes success if they match or error if not,
  * then resets the selection.
  *
  * @param {any} sources - Data source used to resolve the selected folders.
  * @returns {void}
  */
-function check_compatibility(sources) {
+function check_compatibility(rows) {
   if (selectedIndices.length === 2) {
-    const { folder1, folder2 } = get_selected_folders(sources);
-    if (folder1 === folder2) {
+    const { group1, group2 } = get_selected_groups(rows);
+
+    if (group1 === group2) {
       flash_correct();
+
       figures[selectedIndices[0]].deactivate();
       figures[selectedIndices[1]].deactivate();
       figures[selectedIndices[0]].play();
     } else {
       flash_wrong();
     }
+
     reset_selection();
   }
 }
@@ -173,15 +202,13 @@ function check_compatibility(sources) {
  * @throws {TypeError} If `selectedIndices` is not defined as an array of two numeric indices
  *                     or if an index is out of range for the provided `sources`.
  */
-function get_selected_folders(sources) {
+function get_selected_groups(rows) {
   const [i1, i2] = selectedIndices;
-  const src1 = sources[i1];
-  const src2 = sources[i2];
-  const parts1 = src1.split("/");
-  const folder1 = parts1.length > 1 ? parts1[parts1.length - 2] : parts1[0];
-  const parts2 = src2.split("/");
-  const folder2 = parts2.length > 1 ? parts2[parts2.length - 2] : parts2[0];
-  return { folder1, folder2 };
+
+  return {
+    group1: rows[i1].group_id,
+    group2: rows[i2].group_id,
+  };
 }
 
 /**

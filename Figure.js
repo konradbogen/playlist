@@ -1,124 +1,181 @@
+window._ytFigureQueue = [];
+window._ytFigures = [];
+
+window.onYouTubeIframeAPIReady = function () {
+  window._ytFigureQueue.forEach((fig) => fig.initPlayer());
+  window._ytFigureQueue = [];
+};
+
 class Figure {
-  /**
-   * Represents an audio figure composed of an image, an audio element and a play/pause button.
-   *
-   * @class Figure
-   * @param {string} audioSrc - Path or URL to the audio source.
-   * @param {number} index - Zero-based index used to select the image and identify the container.
-   */
-  constructor(audioSrc, index) {
+  constructor(yt_link, start, end, index) {
+    this.yt_link = yt_link;
+    this.start = start;
+    this.end = end;
+
+    this.videoId = this.extractVideoID(yt_link);
+
+    this.player = null;
+    this.ytReady = false;
+    this.isLoaded = false;
+
+    this.playerId = `yt-player-${index}`;
+
     this.container = this.create_figure_container(index);
     this.img = this.create_image(index);
-    this.audio = this.create_audio(audioSrc);
-    this.button = this.create_play_button(this.audio);
+    this.button = this.create_play_button();
+
+    this.playerDiv = document.createElement("div");
+    this.playerDiv.id = this.playerId;
+
+    Object.assign(this.playerDiv.style, {
+      position: "absolute",
+      width: "200px",
+      height: "200px",
+      opacity: "0",
+      pointerEvents: "none",
+    });
+
     this.container.appendChild(this.img);
     this.container.appendChild(this.button);
+    this.container.appendChild(this.playerDiv);
+
+    window._ytFigures.push(this);
+
+    if (typeof YT !== "undefined" && typeof YT.Player === "function") {
+      this.initPlayer();
+    } else {
+      window._ytFigureQueue.push(this);
+    }
   }
 
-  get_container() {
-    /**
-     * Get the root container element for this figure.
-     *
-     * @returns {HTMLDivElement} The figure container element.
-     */
+  initPlayer() {
+    if (this.player) return;
+    console.log(document.getElementById(this.playerId));
+    console.log(document.body.contains(document.getElementById(this.playerId)));
+    this.player = new YT.Player(this.playerId, {
+      height: "200",
+      width: "200",
+      videoId: this.videoId,
+      playerVars: {
+        controls: 0,
+        disablekb: 1,
+        playsinline: 1,
+        autoplay: 0,
+      },
+      events: {
+        onReady: (event) => {
+          console.log("YT Ready:", this.playerId);
+          this.ytReady = true;
+          this.player.seekTo(this.start, true);
+        },
 
-    return this.container;
+        onStateChange: (event) => {
+          if (event.data === YT.PlayerState.PLAYING && !this.isLoaded) {
+            this.isLoaded = true;
+          }
+        },
+
+        onError: (e) => {
+          console.error("YT Error:", e);
+        },
+      },
+    });
   }
 
-  play() {
-    this.audio.currentTime = 0;
-    this.audio.play().catch(() => {});
-  }
-
-  create_play_button(audio) {
-    /**
-     * Create a play/pause button wired to the provided audio element.
-     *
-     * @param {HTMLAudioElement} audio - The audio element to control.
-     * @returns {HTMLButtonElement} The created play/pause button element.
-     */
+  create_play_button() {
     const button = document.createElement("button");
     button.className = "play-button";
     button.textContent = "Play";
 
     button.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (audio.paused) {
-        this.play();
+
+      if (!this.ytReady || !this.player) return;
+
+      const state = this.player.getPlayerState();
+
+      if (state !== YT.PlayerState.PLAYING) {
+        this.player.seekTo(this.start, true);
+        this.player.playVideo();
+
         button.textContent = "Pause";
-        audio.addEventListener("ended", () => (button.textContent = "Play"));
+
+        this.stopTimer();
       } else {
-        audio.pause();
+        this.player.pauseVideo();
         button.textContent = "Play";
       }
     });
+
     return button;
   }
 
-  deactivate() {
-    /**
-     * Deactivate the figure: disable the button, gray out the image and change container background.
-     *
-     * @returns {void}
-     */
+  stopTimer() {
+    if (this.stopInterval) clearInterval(this.stopInterval);
 
+    this.stopInterval = setInterval(() => {
+      if (!this.player) return;
+
+      const current = this.player.getCurrentTime();
+
+      if (current >= this.end) {
+        this.player.pauseVideo();
+        this.button.textContent = "Play";
+
+        clearInterval(this.stopInterval);
+      }
+    }, 100);
+  }
+
+  extractVideoID(url) {
+    const reg =
+      /(?:youtube\.com\/.*v=|youtu\.be\/|youtube\.com\/shorts\/)([^&?\/]+)/;
+
+    const match = url.match(reg);
+
+    let videoId = match ? match[1] : url;
+
+    videoId = videoId.split("?")[0];
+
+    return videoId;
+  }
+
+  deactivate() {
     if (this.button) {
       this.button.disabled = true;
-      this.button.style.backgroundColor = "#d3d3d3"; // light gray
+      this.button.style.backgroundColor = "#d3d3d3";
       this.button.style.color = "grey";
       this.button.style.border = "1px solid #bfbfbf";
       this.button.style.backgroundImage = "none";
       this.button.style.webkitAppearance = "none";
       this.button.style.appearance = "none";
     }
+
     if (this.img) {
       this.img.style.filter = "grayscale(100%)";
     }
   }
 
-  create_audio(audioSrc) {
-    /**
-     * Create and configure an HTMLAudioElement for the given source, handling environment-aware path prefixing.
-     *
-     * @param {string} audioSrc - Audio file path or URL.
-     * @returns {HTMLAudioElement} A preloaded audio element.
-     */
-
-    const baseHost = window.location.hostname;
-    const isProd =
-      baseHost === "konradbogen.com" || baseHost === "www.konradbogen.com";
-    const needsPrefix = !isProd && !/^(https?:|\/\/|file:|\/)/.test(audioSrc);
-    const audio = new Audio(
-      needsPrefix ? "/play_content/" + audioSrc : "/play_content/" + audioSrc,
-    );
-    audio.preload = "auto";
-    return audio;
+  get_container() {
+    return this.container;
   }
 
   create_image(i) {
-    /**
-     * Create an img element for the figure using the provided index to choose the image and alt text.
-     *
-     * @param {number} i - Zero-based index to select the image file and alt text.
-     * @returns {HTMLImageElement} The created image element.
-     */
     const img = document.createElement("img");
+
     img.className = "figure-img";
     img.src = `Icons/${i + 1}.jpeg`;
     img.alt = `Figure ${i + 1}`;
+
     return img;
   }
 
   create_figure_container(i) {
-    /**
-     * Create the figure container element and set its dataset index.
-     *
-     * @param {number} i - Zero-based index to assign to the container's data-index.
-     * @returns {HTMLDivElement} The created container element.
-     */
     const container = document.createElement("div");
+
     container.className = "audio-figure";
     container.dataset.index = i;
+
     return container;
   }
 }
