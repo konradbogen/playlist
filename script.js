@@ -19,6 +19,8 @@ let selectedIndices = [];
 let randomizedSources = [];
 let matchedPairs = 0;
 let currentLevel = 1;
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let yeahBuffer;
 
 /**
  * Load the current level from the URL, select the matching folder set,
@@ -50,31 +52,69 @@ function createStartButton() {
     left: "0",
     width: "100%",
     height: "100%",
-    backgroundColor: "rgba(255,255,255,0.95)",
+    backgroundColor: "#ffffff", // Solid white for a clean app feel
     display: "flex",
+    flexDirection: "column", // Stack logo and button
     justifyContent: "center",
     alignItems: "center",
-    zIndex: "1000",
+    zIndex: "10000",
+    gap: "40px", // Space between logo and button
   });
 
+  // 1. Add Logo
+  const logo = document.createElement("img");
+  logo.src = "logo.png"; // Ensure this path is correct
+  logo.alt = "Game Logo";
+  Object.assign(logo.style, {
+    width: "90%", // Adjust based on your logo shape
+    height: "auto",
+    maxWidth: "90%", // Prevents logo from overflowing on small phones
+  });
+
+  // 2. Add Button
   const btn = document.createElement("button");
-  btn.textContent = "Start Game";
-  btn.style.padding = "20px 40px";
-  btn.style.fontSize = "24px";
+  btn.textContent = "START GAME";
+  Object.assign(btn.style, {
+    padding: "25px 60px",
+    fontSize: "60px",
+    fontWeight: "bold",
+    backgroundColor: "#007AFF", // iOS Blue
+    color: "white",
+    border: "none",
+    borderRadius: "15px",
+    cursor: "pointer",
+    boxShadow: "0 10px 20px rgba(0,0,0,0.1)",
+    webkitAppearance: "none", // Removes default iOS button styling
+    letterSpacing: "2px",
+  });
+
+  // 3. iPhone "Active" state feedback
+  btn.ontouchstart = () => (btn.style.backgroundColor = "#0051a8");
+  btn.ontouchend = () => (btn.style.backgroundColor = "#007AFF");
 
   btn.onclick = () => {
-    // Prime every figure
-    figures.forEach((fig) => {
+    // Prime every figure (using Object.values since figures is an object)
+    const figuresList = Object.values(figures);
+
+    figuresList.forEach((fig) => {
       if (fig.player && fig.ytReady) {
         fig.player.mute();
         fig.player.playVideo();
-        fig.player.pauseVideo();
-        fig.player.unMute();
+        // Give it a tiny timeout to ensure the buffer starts
+        setTimeout(() => {
+          fig.player.pauseVideo();
+          fig.player.unMute();
+        }, 100);
       }
     });
-    overlay.remove();
+
+    // Fade out overlay for a smoother transition
+    overlay.style.transition = "opacity 0.5s ease";
+    overlay.style.opacity = "0";
+    setTimeout(() => overlay.remove(), 500);
   };
 
+  overlay.appendChild(logo);
   overlay.appendChild(btn);
   document.body.appendChild(overlay);
 }
@@ -115,13 +155,17 @@ function getLevelFromURL() {
  */
 function renderBoard(rows) {
   // Change let figures = new Map(); to an object if you use index keys
-  let figures = {};
   board.innerHTML = "";
   selectedIndices = [];
   matchedPairs = 0;
 
   rows.forEach((row, i) => {
     const figure = new Figure(row.youtube_link, row.start_sec, row.end_sec, i);
+    figure.callback_play = () => {
+      Object.values(figures).forEach((fig) => {
+        fig.reset_border();
+      });
+    };
     figures[i] = figure; // Store in the global object
 
     const container = figure.get_container();
@@ -176,15 +220,13 @@ function check_compatibility(rows) {
 
     if (group1 === group2) {
       flash_correct();
-
       figures[selectedIndices[0]].deactivate();
       figures[selectedIndices[1]].deactivate();
-      figures[selectedIndices[0]].play();
+      reset_selection(figures[selectedIndices[0]].getLength() * 1000);
     } else {
       flash_wrong();
+      reset_selection(2000);
     }
-
-    reset_selection();
   }
 }
 
@@ -224,7 +266,7 @@ function get_selected_groups(rows) {
  * @function reset_selection
  * @returns {void} No value returned.
  */
-function reset_selection() {
+function reset_selection(length) {
   const body = document.body;
   setTimeout(() => {
     body.style.background = "";
@@ -232,7 +274,7 @@ function reset_selection() {
     document.querySelectorAll(".audio-figure.selected").forEach((el) => {
       el.classList.remove("selected");
     });
-  }, 1000);
+  }, length);
 }
 
 /**
@@ -262,9 +304,33 @@ function flash_wrong() {
  */
 function flash_correct() {
   const body = document.body;
-  body.style.background = "#c8f7c5";
-  const audioYes = new Audio("Sounds/yes.mp3");
-  audioYes.play();
+  body.style.background = "#7dffa0";
+
+  // RESUME is critical here for iOS
+  audioCtx.resume().then(() => {
+    const source = audioCtx.createBufferSource();
+    source.buffer = yeahBuffer;
+    source.connect(audioCtx.destination);
+
+    // Trigger the figure play - force a seek to ensure the
+    // hardware audio channel "opens" for both YT and WebAudio
+    figures[selectedIndices[0]].play(true);
+
+    animate(figures[selectedIndices[0]].getLength() * 1000);
+
+    // Start the YEAH sound
+    source.start(0);
+  });
+}
+
+function initYeahSound() {
+  fetch("Sounds/yes.mp3")
+    .then((res) => res.arrayBuffer())
+    .then((data) => audioCtx.decodeAudioData(data))
+    .then((buffer) => {
+      yeahBuffer = buffer;
+    });
 }
 
 loadCurrentLevel();
+initYeahSound();

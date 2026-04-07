@@ -1,5 +1,5 @@
 body {
-  font-family: "Comic Sans MS", cursive, sans-serif;
+  font-family: "Helvetica", cursive, sans-serif;
   background: linear-gradient(to bottom right, #fdf6e3, #d2f1f0);
   display: flex;
   justify-content: center;
@@ -15,17 +15,23 @@ body {
 
 #audio-board {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(4, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
   width: 95vw;
-  height: calc(90vh - 16px * 3);
-  max-height: calc(90vh - 16px * 3);
-  padding: 8px;
+  height: 90vh; /* Simplify this */
+  max-height: 95dvh; /* Use dynamic viewport height for mobile/desktop harmony */
+  gap: 20px; /* Reducing the gap slightly on desktop helps prevent crowding */
+  padding: 16px;
   box-sizing: border-box;
 }
 
+#audio-board > * {
+  min-height: 0; /* Forces grid items to respect row height */
+  min-width: 0; /* Forces grid items to respect column width */
+}
+
 .audio-figure {
+  overflow: hidden;
   width: 100%;
   height: 100%;
   background: #ffffff;
@@ -39,15 +45,27 @@ body {
   gap: 10px;
   cursor: pointer;
   padding: 8px;
-  transition: transform 0.2s, box-shadow 0.3s, border-color 0.3s;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    background-color 0.2s ease;
+  will-change: transform, opacity;
+}
+
+/* Slightly lift the element being dragged */
+.audio-figure[draggable="true"]:active,
+.audio-figure.selected {
+  transform: scale(1.02);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+  z-index: 10;
 }
 
 .figure-img {
   flex: 1;
   width: 100%;
+  height: 100%;
   object-fit: contain;
   border-radius: 8px;
-  transform: rotate(-90deg);
 }
 
 .play-button {
@@ -60,7 +78,9 @@ body {
   font-weight: bold;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.3s, transform 0.2s;
+  transition:
+    background 0.3s,
+    transform 0.2s;
 }
 
 .play-button:hover {
@@ -69,14 +89,30 @@ body {
 }
 
 .audio-figure.selected {
-  border-color: #ff7f50;
-  box-shadow: 0 0 20px #ff7f50;
+  border-color: #ad2e00;
+  box-shadow: 0 0 20px #ff0707;
   background: #fff0e0;
+}
+
+.figure-img.played {
+  animation: bounce 1.2s infinite;
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: rotate(-90deg) translateX(15px);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: rotate(-90deg) translateX(-20px);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
 }
 
 @media (max-width: 600px) {
   #audio-board {
-    gap: 18px;
+    gap: 30px;
     padding: 10px;
   }
 }
@@ -89,4 +125,16 @@ body {
 .level-screen h2 {
   font-size: 24px;
   margin-bottom: 20px;
+}
+
+#confetti-canvas {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
 }

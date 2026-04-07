@@ -11,7 +11,7 @@ class Figure {
     this.yt_link = yt_link;
     this.start = start;
     this.end = end;
-
+    this.callback_play;
     this.videoId = this.extractVideoID(yt_link);
 
     this.player = null;
@@ -48,7 +48,15 @@ class Figure {
     }
   }
 
+  getLength() {
+    return this.end - this.start;
+  }
+
   initPlayer() {
+    if (!document.body.contains(this.playerDiv)) {
+      setTimeout(() => this.initPlayer(), 50);
+      return;
+    }
     if (this.player) return;
     console.log(document.getElementById(this.playerId));
     console.log(document.body.contains(document.getElementById(this.playerId)));
@@ -66,7 +74,7 @@ class Figure {
         onReady: (event) => {
           console.log("YT Ready:", this.playerId);
           this.ytReady = true;
-          this.player.seekTo(this.start, true);
+          this.player.seekTo(this.start, false);
         },
 
         onStateChange: (event) => {
@@ -91,23 +99,37 @@ class Figure {
       e.stopPropagation();
 
       if (!this.ytReady || !this.player) return;
-
       const state = this.player.getPlayerState();
 
       if (state !== YT.PlayerState.PLAYING) {
-        this.player.seekTo(this.start, true);
-        this.player.playVideo();
-
+        this.callback_play();
         button.textContent = "Pause";
-
-        this.stopTimer();
       } else {
         this.player.pauseVideo();
         button.textContent = "Play";
       }
+      this.play();
     });
 
     return button;
+  }
+
+  reset_border() {
+    this.img.classList.remove("played");
+    this.button.textContent = "Play";
+  }
+
+  play(forceSeek = false) {
+    this.img.classList.add("played");
+    const state = this.player.getPlayerState();
+
+    // On iPhone, re-triggering seekTo(currentTime) can sometimes
+    // "reset" the audio focus so the Web Audio API can layer on top.
+    if (state !== YT.PlayerState.PLAYING || forceSeek) {
+      this.player.seekTo(this.start, true);
+      this.player.playVideo();
+      this.stopTimer();
+    }
   }
 
   stopTimer() {
@@ -141,6 +163,7 @@ class Figure {
   }
 
   deactivate() {
+    this.reset_border();
     if (this.button) {
       this.button.disabled = true;
       this.button.style.backgroundColor = "#d3d3d3";
