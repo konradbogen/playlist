@@ -23,7 +23,7 @@ class Figure {
     this.container = this.create_figure_container(index);
     this.img = this.create_image(index);
     this.button = this.create_play_button();
-
+    this.active = true;
     this.playerDiv = document.createElement("div");
     this.playerDiv.id = this.playerId;
 
@@ -75,6 +75,7 @@ class Figure {
           console.log("YT Ready:", this.playerId);
           this.ytReady = true;
           this.player.seekTo(this.start, false);
+          this.player.pauseVideo();
         },
 
         onStateChange: (event) => {
@@ -119,8 +120,10 @@ class Figure {
     this.button.textContent = "Play";
   }
 
-  play(forceSeek = false) {
-    this.img.classList.add("played");
+  play(forceSeek = false, bounce = true) {
+    if (bounce) {
+      this.img.classList.add("played");
+    }
     const state = this.player.getPlayerState();
 
     // On iPhone, re-triggering seekTo(currentTime) can sometimes
@@ -163,6 +166,7 @@ class Figure {
   }
 
   deactivate() {
+    this.active = false;
     this.reset_border();
     if (this.button) {
       this.button.disabled = true;
@@ -189,7 +193,7 @@ class Figure {
     img.className = "figure-img";
     img.src = `Icons/${i + 1}.jpeg`;
     img.alt = `Figure ${i + 1}`;
-
+    img.draggable = false;
     return img;
   }
 
