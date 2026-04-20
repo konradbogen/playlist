@@ -97,15 +97,52 @@ function get_sources(folders) {
  * @see Figure#get_container
  * @see check_compatibility
  */
-function renderBoard(sources) {
+async function renderBoard(rows) {
+  // Change let figures = new Map(); to an object if you use index keys
   board.innerHTML = "";
   selectedIndices = [];
   matchedPairs = 0;
+  const clock = new SyncClock();
+  rows.forEach(async (row, i) => {
+    let figure = null;
+    if (row.audio_file == null) {
+      figure = new StaticFigure(
+        row.youtube_link,
+        row.start_sec,
+        row.end_sec,
+        i,
+      );
+    } else {
+      figure = new LoopFigure(
+        row.audio_file,
+        row.end_sec,
+        row.start_sec,
+        i,
+        clock,
+      );
+      figure.url = row.group_id.toString() + row.figure_id.toString();
+      const res = await fetch(row.audio_file);
+      const arrayBuffer = await res.arrayBuffer();
+      figure.buffer = await clock.ctx.decodeAudioData(arrayBuffer);
+    }
+    figure.callback_play = () => {
+      logAction("play");
+      for (const fig of figures.values()) {
+        fig.reset_border();
+      }
+    };
+    figures.set(i, figure);
 
-  sources.forEach((audioSrc, i) => {
-    var figure = new Figure(audioSrc, i);
-    figures[i] = figure;
-    var container = figure.get_container();
+    const container = figure.get_container();
+    container.figureInstance = figure;
+    container.dataset.groupId = row.group_id;
+    if (allowMovement) {
+      container.setAttribute("draggable", "true");
+      addDragAndDropHandlers(container);
+    }
+
+    board.appendChild(container);
+
     container.addEventListener("click", function () {
       if (container.classList.contains("selected")) {
         container.classList.remove("selected");

@@ -1,33 +1,12 @@
 class Figure {
-  /**
-   * Represents an audio figure composed of an image, an audio element and a play/pause button.
-   *
-   * @class Figure
-   * @param {string} audioSrc - Path or URL to the audio source.
-   * @param {number} index - Zero-based index used to select the image and identify the container.
-   */
-  constructor(audioSrc, index) {
+  constructor(index) {
     this.container = this.create_figure_container(index);
     this.img = this.create_image(index);
     this.audio = this.create_audio(audioSrc);
     this.button = this.create_play_button(this.audio);
     this.container.appendChild(this.img);
     this.container.appendChild(this.button);
-  }
-
-  get_container() {
-    /**
-     * Get the root container element for this figure.
-     *
-     * @returns {HTMLDivElement} The figure container element.
-     */
-
-    return this.container;
-  }
-
-  play() {
-    this.audio.currentTime = 0;
-    this.audio.play().catch(() => {});
+    this.container.appendChild(this.playerDiv);
   }
 
   create_play_button(audio) {
@@ -43,16 +22,14 @@ class Figure {
 
     button.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (audio.paused) {
-        this.play();
-        button.textContent = "Pause";
-        audio.addEventListener("ended", () => (button.textContent = "Play"));
-      } else {
-        audio.pause();
-        button.textContent = "Play";
-      }
+
+      this.play();
     });
     return button;
+  }
+
+  reset_border() {
+    this.img.classList.remove("played");
   }
 
   deactivate() {
