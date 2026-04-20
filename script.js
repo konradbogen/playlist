@@ -390,34 +390,14 @@ function isMovable(index) {
  * @see Figure#get_container
  * @see check_compatibility
  */
-async function renderBoard(rows) {
+function renderBoard(rows) {
   // Change let figures = new Map(); to an object if you use index keys
   board.innerHTML = "";
   selectedIndices = [];
   matchedPairs = 0;
-  const clock = new SyncClock();
-  rows.forEach(async (row, i) => {
-    let figure = null;
-    if (row.audio_file == null) {
-      figure = new StaticFigure(
-        row.youtube_link,
-        row.start_sec,
-        row.end_sec,
-        i,
-      );
-    } else {
-      figure = new LoopFigure(
-        row.audio_file,
-        row.end_sec,
-        row.start_sec,
-        i,
-        clock,
-      );
-      figure.url = row.group_id.toString() + row.figure_id.toString();
-      const res = await fetch(row.audio_file);
-      const arrayBuffer = await res.arrayBuffer();
-      figure.buffer = await clock.ctx.decodeAudioData(arrayBuffer);
-    }
+
+  rows.forEach((row, i) => {
+    const figure = new Figure(row.youtube_link, row.start_sec, row.end_sec, i);
     figure.callback_play = () => {
       logAction("play");
       for (const fig of figures.values()) {
@@ -437,20 +417,33 @@ async function renderBoard(rows) {
     board.appendChild(container);
 
     container.addEventListener("click", function () {
+      const currentNodes = Array.from(board.children);
+      const currentIdx = currentNodes.indexOf(container);
+
       if (container.classList.contains("selected")) {
         container.classList.remove("selected");
-        selectedIndices = selectedIndices.filter((idx) => idx !== i);
-      } else if (selectedIndices.length < 2) {
-        container.classList.add("selected");
-        selectedIndices.push(i);
-        check_compatibility(randomizedSources);
+        selectedElements = [];
+        resetVisuals();
+      } else if (selectedElements.length < 2) {
+        if (selectedElements.length === 0) {
+          container.classList.add("selected");
+          selectedElements.push(container); // Element speichern
+          highlightValidNeighbors(currentIdx);
+        } else {
+          const firstIdx = currentNodes.indexOf(selectedElements[0]);
+          if (isOrthogonal(firstIdx, currentIdx)) {
+            container.classList.add("selected");
+            selectedElements.push(container);
+            check_compatibility(); // Keine 'rows' mehr nötig
+            resetVisuals();
+          }
+        }
       }
     });
-    board.appendChild(container);
   });
-}
 
-// Show the overlay after the board is rendered
+  // Show the overlay after the board is rendered
+}
 
 // Move this OUTSIDE renderBoard to the global scope
 window.onYouTubeIframeAPIReady = function () {
